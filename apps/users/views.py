@@ -1,11 +1,17 @@
-from django.shortcuts import render
+from datetime import datetime
+
+from django.contrib.auth.password_validation import validate_password
+from django.db.models import Q
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from apps.users.serializers import SignUpSerializer
+from rest_framework.authtoken.models import Token
+from apps.users.models import User, UserVerification
+from apps.users.serializers import SignUpSerializer, UserFillingDataSerializer
 
 
 class SignUpApiView(APIView):
@@ -15,14 +21,86 @@ class SignUpApiView(APIView):
         data = request.data
         serializer = SignUpSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        refresh_token = RefreshToken.for_user(request.user)
+        email = serializer.validated_data.get('email')
+        user = get_object_or_404(User.objects.all(), email=email)
+        refresh_token = RefreshToken.for_user(user)
         tokens = {
             'refresh': str(refresh_token),
             'access': str(refresh_token.access_token)
         }
-        serializer.data['tokens'] = tokens
+        data = serializer.data
+        data['tokens'] = tokens
         return Response({
-            'data': serializer.data,
+            'data': data,
             'description': "Emailingizga tasdiqlash kodi yuborildi",
             'status': status.HTTP_201_CREATED
         })
+
+
+class VerifyCodeApiView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        code = request.data.get('code')
+        user = request.user
+        verifies = UserVerification.objects.filter(
+            Q(user=user) & Q(time_limit__gt=datetime.now()) & Q(is_confirmed=False) & Q(code=code))
+        if verifies.exists():
+            verify = verifies.first()
+            verify.is_confirmed = True
+            user.status = 'code'
+            user.save()
+            tokens = Token.objects.get_or_create(user=user)
+            refresh = RefreshToken.for_user(user=user)
+            return Response(
+                {
+                    'description': "Kod muvaffaqiyatli tasdiqlandi",
+                    'tokens': {
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token)
+                    },
+                    'status': status.HTTP_200_OK,
+                }
+            )
+        return Response(
+            {
+                'description': "Siz noto'g'ri kod kiritdingiz",
+                'status': status.HTTP_400_BAD_REQUEST
+            }
+        )
+
+
+class UserFillingDataApiView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        password = request.data.get('password')
+        confirm_password = request.data.get('confirm_password')
+        role = request.data.get('role_name')
+        user = request.user
+        if user.status == "new":
+            raise PermissionDenied('Sizda ruxsat yo\'q')
+        data = request.data
+        validate_password(password)
+        if password != confirm_password:
+            raise ValidationError(
+                {
+                    'description': 'Password va Confirm_password bir-biriga teng emas',
+                    'status': status.HTTP_400_BAD_REQUEST
+                }
+            )
+
+        serializer = UserFillingDataSerializer(instance=user, data=data)
+        serializer.is_valid(raise_exception=True)
+        print('serializer_data', serializer.validated_data)
+        serializer.save()
+        user.set_password(password)
+        user.save()
+        print(user.role.all())
+        return Response(
+            {
+                'data': serializer.data,
+                'description': 'Sizning ma\'lumotlaringiz muvaffaqiyatli to\'ldirildi',
+                'status': status.HTTP_200_OK
+            }
+        )

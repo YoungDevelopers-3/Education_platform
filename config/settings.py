@@ -41,9 +41,11 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.lessons',
     'apps.shared',
+    'apps.profiles',
 
     # installed apps
     'decouple',
+    'phonenumbers',
     'psycopg2',
     'ckeditor',
     'rest_framework',

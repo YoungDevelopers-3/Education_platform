@@ -7,6 +7,7 @@ from django.db import models
 from apps.shared.models import BaseModel
 
 ROLE = (
+    ('begona', 'begona'),
     ('admin', 'admin'),
     ('teacher', 'teacher'),
     ('pupil', 'pupil'),
@@ -21,7 +22,7 @@ STATUS = (
 
 
 class Role(BaseModel):
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=10, choices=ROLE, default='begona', unique=True)
     description = models.TextField()
 
     def __str__(self):
@@ -31,7 +32,6 @@ class Role(BaseModel):
 class User(AbstractUser, BaseModel):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=17, unique=True, null=True, blank=True)
-    photo = models.ImageField(null=True, blank=True, upload_to='users/images/')
     role = models.ManyToManyField(Role)
     status = models.CharField(choices=STATUS, default='new')
 

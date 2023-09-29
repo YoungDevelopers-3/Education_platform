@@ -1,7 +1,10 @@
 import uuid
+import phonenumbers
 from random import randint
 
+from django.contrib.auth.password_validation import validate_password
 from django.template.context_processors import static
+from phonenumbers import NumberParseException
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
 
@@ -14,9 +17,9 @@ class SignUpSerializer(serializers.ModelSerializer):
         model = User
         fields = ('email',)
 
-    def validate(self, email):
+    def validate(self, attrs):
+        email = attrs.get('email')
         if check_email(email):
-            print(2)
             if User.objects.filter(email=email).exists():
                 raise ValidationError(
                     {
@@ -25,10 +28,10 @@ class SignUpSerializer(serializers.ModelSerializer):
                     }
                 )
             user = self.create_user(email)
-            code = user.create_verification_code()
+            code = user.create_verify_code()
             send_email(email, code)
 
-            return email
+            return attrs
         else:
             raise ValidationError(
                 {
@@ -46,3 +49,35 @@ class SignUpSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+
+class UserFillingDataSerializer(serializers.ModelSerializer):
+    role_name = serializers.StringRelatedField(source='role.name')
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'phone', 'role_name', 'password')
+        extra_kwargs = {
+            "password": {"required": True}
+        }
+
+    def validate_phone(self, phone):
+        try:
+            x = phonenumbers.parse(phone)
+            if not phonenumbers.is_valid_number(x):
+                raise ValidationError(
+                    {
+                        'description': "Invalid phone number",
+                        'status': status.HTTP_400_BAD_REQUEST
+                    }
+                )
+            return phone
+        except NumberParseException:
+            print('number_parse_exaption')
+            raise ValidationError(
+                {
+                    'description': "Ushbu telefon raqami to'g'ri emas",
+                    'maslahat': "+9980000000 ko'rinishida telefon raqami kiriting !",
+                    'status': status.HTTP_400_BAD_REQUEST
+                }
+            )

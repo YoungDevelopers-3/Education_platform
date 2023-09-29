@@ -4,11 +4,12 @@ import threading
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 
-regex_email = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
+regex = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
 
 
 def check_email(email):
-    if re.fullmatch(regex_email, email):
+    print(email)
+    if re.fullmatch(regex, email):
         return True
     else:
         return False
