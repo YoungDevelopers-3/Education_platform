@@ -18,8 +18,8 @@ DAYS = (
 
 class Teacher(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile_teacher')
-    photo = models.ImageField(null=True, blank=True, upload_to=f"teachers/{user}/")
-    bio = RichTextField()
+    photo = models.ImageField(null=True, blank=True, upload_to="teachers/photo/")
+    bio = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username}'s profile"
@@ -27,7 +27,7 @@ class Teacher(BaseModel):
 
 class Lesson(BaseModel):
     title = models.CharField(max_length=221)
-    image = models.ImageField(null=True, blank=True, upload_to=f'lessons/{title}/')
+    image = models.ImageField(null=True, blank=True, upload_to='lessons/image/')
     description = RichTextField()
     teachers = models.ManyToManyField(Teacher, related_name='lessons')
 
@@ -47,8 +47,8 @@ class TimeLesson(BaseModel):
 
 class Pupil(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile_pupil')
-    photo = models.ImageField(null=True, blank=True, upload_to=f"pupils/{user}/")
-    bio = RichTextField()
+    photo = models.ImageField(null=True, blank=True, upload_to="pupils/photo/")
+    bio = models.TextField(null=True, blank=True)
     lessons = models.ManyToManyField(Lesson, related_name='pupils')
 
     def __str__(self):

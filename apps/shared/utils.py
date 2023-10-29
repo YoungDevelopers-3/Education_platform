@@ -1,6 +1,7 @@
 import re
 import threading
 
+import phonenumbers
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 
@@ -13,6 +14,18 @@ def check_email(email):
         return True
     else:
         return False
+
+
+def check_username_email_or_phone(data):
+    try:
+        x = phonenumbers.parse(data)
+        if phonenumbers.is_valid_number(x):
+            return 'phone'
+    except phonenumbers.NumberParseException:
+        if re.fullmatch(regex, data):
+            return 'email'
+        else:
+            return 'username'
 
 
 class EmailThread(threading.Thread):

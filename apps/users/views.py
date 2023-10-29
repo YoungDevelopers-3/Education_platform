@@ -10,8 +10,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from apps.shared.utils import send_email
 from apps.users.models import User, UserVerification
-from apps.users.serializers import SignUpSerializer, UserFillingDataSerializer
+from apps.users.serializers import SignUpSerializer, UserFillingDataSerializer, LoginSerializer, LoginRefreshSerializer, \
+    LogOutSerializer
 
 
 class SignUpApiView(APIView):
@@ -70,6 +74,28 @@ class VerifyCodeApiView(APIView):
         )
 
 
+class VerifyAgainApiView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        user = request.user
+        verifications = user.verifications.filter(is_confirmed=False, time_limit__gt=datetime.now())
+        if verifications.exists():
+            raise ValidationError(
+                {
+                    'detail': "Sizda yaroqli kod mavjud, iltimos biroz kuting!",
+                    'status': status.HTTP_400_BAD_REQUEST
+                }
+            )
+        else:
+            code = user.create_verify_code()
+            send_email(user.email, code)
+            return Response({
+                'detail': 'Emailingizga yangi tasdiqlash kodi yuborildi',
+                'status': status.HTTP_200_OK
+            })
+
+
 class UserFillingDataApiView(APIView):
     permission_classes = (IsAuthenticated,)
 
@@ -95,6 +121,7 @@ class UserFillingDataApiView(APIView):
         print('serializer_data', serializer.validated_data)
         serializer.save()
         user.set_password(password)
+        user.status = 'done'
         user.save()
         print(user.role.all())
         return Response(
@@ -104,3 +131,42 @@ class UserFillingDataApiView(APIView):
                 'status': status.HTTP_200_OK
             }
         )
+
+
+class LoginAPIView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        data = request.data
+        serializer = LoginSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(
+            {
+                'data': serializer.validated_data,
+                'status': status.HTTP_200_OK
+            }
+        )
+
+
+class LoginRefreshApiView(TokenRefreshView):
+    serializer_class = LoginRefreshSerializer
+
+
+class LogOutAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        data = request.data
+        serializer = LogOutSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            refresh_token = data.get('refresh')
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            data = {
+                "detail": "You are successfully logged out"
+            }
+            return Response(data, status=205)
+        except:
+            return Response(status=400)

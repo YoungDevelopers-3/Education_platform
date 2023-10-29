@@ -16,7 +16,6 @@ ROLE = (
 STATUS = (
     ('new', 'new'),
     ('code', 'code'),
-    ('username', 'username'),
     ('done', 'done'),
 )
 
